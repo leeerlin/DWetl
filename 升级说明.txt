@@ -1,0 +1,79 @@
+升级内容：
+1.增加导出后内容和原有数据库内容的比较，不同时报警，并尝试恢复
+2.增加导入后数据库和原有内容的比较，不同时报警，并尝试恢复
+3.根据列表对文件进行导出
+
+分析：
+导出后的文件信息包括：
+1.数据库结构文件（create目录下），每个模式一个文件，包含所有数据库对象的结构
+2.数据对象列表文件（db2move.lst文件），每个模式一个文件，包含表名称，数据文件名称，信息文件名称
+3.数据导出情况记录文件（EXPORT.out），每个模式一个文件，包含表名称和导出的记录数
+4.数据文件，每个表一个文件，二进制文件，不可解析
+5.信息文件，每个表一个文件，包含导出表时的信息
+
+可能会需要导出的对象类型包括：
+1.表：通过db2look生成建表语句：db2look -e -d nn118 -i db2admin -w db2@admin -z DM -t T_MTH_BAD_LOAN_BALANCE_QUALITY_BAK -td \# -o DDL.tmp
+2.视图：通过db2look生成创建语句：db2look -e -d nn118 -i db2admin -w db2@admin -z DM -v V_TEN_CREDIT_SRC_USAGE_DETAIL -td \# -o DDL.tmp
+3.存过: 通过export进行导出：db2 "export to /dev/null of del lobs to /db2home/db2inst1/tmp/lib/tmp lobfile DDL.TMP modified by lobsinfile select text||'#' from syscat.procedures where procschema='DM' and procname='P_LOAB_FINAL_FACT'"
+4.函数：通过export进行导出：db2 "export to /dev/null of del lobs to /db2home/db2inst1/tmp/lib/tmp lobfile DDL.TMP modified by lobsinfile SELECT BODY||'#' FROM SYSCAT.FUNCTIONS WHERE FUNCSCHEMA = 'ETL' AND FUNCNAME = 'F_TABLE_TO_COL_ETL_DM'"
+5.索引: 包含于表导出的语句中
+6.序列：SELECT 'CREATE SEQUENCE '||TRIM(SEQSCHEMA)||'.'||TRIM(SEQNAME)||' AS INTEGER MINVALUE '||MINVALUE||' MAXVALUE '||MAXVALUE||' START WITH '||START||' INCREMENT BY '||INCREMENT||' CACHE '||CACHE||' '||CASE WHEN CYCLE = 'Y' THEN 'CYCLE' ELSE 'NO CYCLE' END||' '||CASE WHEN ORDER = 'Y' THEN 'ORDER' ELSE 'NO ORDER' END||' #'  FROM SYSCAT.SEQUENCES WHERE SEQSCHEMA = 'DAP' AND SEQNAME = 'SEQ_DAP_UNI_CUBE'
+				SELECT 'ALTER SEQUENCE '||TRIM(SEQSCHEMA)||'.'||TRIM(SEQNAME)||' RESTART WITH '||TO_CHAR(INTEGER(NEXTCACHEFIRSTVALUE)+INTEGER(CACHE)-1) FROM SYSCAT.SEQUENCES WHERE SEQSCHEMA = 'DAP' AND SEQNAME = 'SEQ_DAP_UNI_CUBE'
+7.注释：包含于表导出的语句中
+
+功能解析：
+1.导出后数据库内容对比，可对比的项目包括:
+1.1模式下的表，存过，视图，索引，序列，函数的个数
+1.2表数据的记录条数
+
+开发思路：
+1.1模式下的表，存过，视图，索引，序列，函数的个数
+1.1.1 $DW_HOME/export/check_exp_db_create.sh
+入参：模式名
+数据库中提取信息，通过查询syscat模式下的视图，将明细数据导出到临时文件$DW_HOME/file/tmp/export_db_create/{模式名}.lst
+包含信息：-｛结构类型｝-｛模式名｝-｛名称｝-，例如：-TABLE-DM-T_ORG_BIZ_LVL-
+1.1.2 $DW_HOME/export/check_exp_file_create.sh
+入参：模式名
+导出文件中提取信息，通过多导出的结构文件进行分析，将明细数据导出到临时文件$DW_HOME/file/tmp/export_file_create/{模式名}.lst
+包含信息：-｛结构类型｝-｛模式名｝-｛名称｝-，例如：-TABLE-DM-T_ORG_BIZ_LVL-
+1.1.3 $DW_HOME/export/check_exp_create.sh
+入参：模式名
+对两个文件进行分析，产生分析结果到文件$DW_HOME/file/check/{模式名}/export_db_create.info和$DW_HOME/file/check/{模式名}/export_file_create.info
+对产生的分析结果文件进行对比，如通过则生成正确文件$DW_HOME/file/check/｛模式名｝.success，反之生成$DW_HOME/file/check/｛模式名｝.error
+并将匹配不到的问题记录在$DW_HOME/file/check/｛模式名｝.error文件中
+包含信息：-｛模式名｝-｛数据库中的数量｝-｛导出文件中的数量｝-
+1.1.4 $DW_HOME/export/check_error_detail.sh(删除，已嵌入check_exp_create.sh中)
+入参：模式名，结构类型
+发生error错误时使用，对比tmp目录下的文件，以数据库导出的文件为主要信息，找到导出文件中不存在的记录，并将信息追加到.error文件中
+包含信息：-MISS-OBJECT-｛结构类型｝-｛模式名｝-｛名称｝-
+1.1.5 $DW_HOME/export/check_exp.sh
+入参：模式名
+导出数据校验的总调度过程
+------------------------------
+3.根据列表对文件进行导出
+3.1单个对象的结构 $DW_HOME/export/export_single_structure.sh
+入参：｛结构类型｝ ｛模式名｝ ｛名称｝，例如：TABLE DM T_ORG_BIZ_LVL
+将对象的结构，导出到对应的文件$DW_HOME/file/create/{模式名}.sql中，以#为分隔符，输出信息包括：导出文件成功
+需要有的功能包括：
+		确认需要导出的对象在数据库中是否存在
+		确认需要导出到文件中的对象信息是否已经存在
+3.2单个对象的数据 $DW_HOME/export/export_single_data.sh
+入参：｛结构类型｝ ｛模式名｝ ｛名称｝，例如：TABLE DM T_ORG_BIZ_LVL
+将表对象的数据，导出到对应的目录$DW_HOME/file/data/{模式名}/中，包含文件：数据文件，.lst文件，.out文件
+需要有的功能包括：
+		确认需要导出的对象在数据库中是否存在
+		确认需要导出到文件中的对象信息是否已经存在
+3.3单个对象结构数据导出 $DW_HOME/export/export_single.sh
+入参：没有时使用模式LIST文件，或者传入自定义的LIST文件全路径
+需要有的功能包括：
+		确认需要导出的对象在数据库中是否存在
+		确认需要导出到文件中的对象信息是否已经存在
+		调度export_single_structure.sh和export_single_data.sh导出信息
+		记录日志：
+			文件1：=｛结构类型｝=｛模式名｝=｛名称｝=
+			结构导出状态：成功，对象不存在，对象已存在于导出的文件中
+			数据导出状态：成功，对象不存在，对象已存在于导出的文件中
+			总共的对象数：
+			成功的对象数：
+			对象不存在的对象数：
+			对象已存在于导出的文件中的对象数：
