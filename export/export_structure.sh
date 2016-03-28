@@ -35,3 +35,5 @@ fi;
 
 db2look -d ${DATABASE} -i ${USERID} -w ${USERPASSWD} -ct -e -z ${SCHEMA} -td \# -o ${PWDNOW}/../file/create/${SCHEMA}.sql
 sed -i '/CONNECT TO/d' ${PWDNOW}/../file/create/${SCHEMA}.sql ${PWDNOW}/../file/create/${SCHEMA}.sql
+sed -i '/CONNECT RESET/d' ${PWDNOW}/../file/create/${SCHEMA}.sql ${PWDNOW}/../file/create/${SCHEMA}.sql
+sed -i '/TERMINATE/d' ${PWDNOW}/../file/create/${SCHEMA}.sql ${PWDNOW}/../file/create/${SCHEMA}.sql
