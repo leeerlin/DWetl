@@ -65,13 +65,13 @@ fi;
 #存过
 if [ ${TYPE} = 'PROCEDURE' ] ; then
 db2 connect to ${DATABASE} user ${USERID} using ${USERPASSWD} > /dev/null 2>&1
-db2 "export to /dev/null of del lobs to ../file/tmp lobfile DDL.TMP modified by lobsinfile select text||'#' from syscat.procedures where procschema='${SCHEMA}' and procname='${OBNAME}'"
+db2 "export to /dev/null of del lobs to ../file/tmp lobfile DDL.TMP modified by lobsinfile select text||'#' from syscat.procedures where procschema='${SCHEMA}' and procname='${OBNAME}'" > /dev/null 2>&1
 mv ${PWDNOW}/../file/tmp/DDL.TMP.* ${PWDNOW}/../file/tmp/DDL.tmp
 fi;
 #函数
 if [ ${TYPE} = 'FUNCTION' ] ; then
 db2 connect to ${DATABASE} user ${USERID} using ${USERPASSWD} > /dev/null 2>&1
-db2 "export to /dev/null of del lobs to ../file/tmp lobfile DDL.TMP modified by lobsinfile SELECT BODY||'#' FROM SYSCAT.FUNCTIONS WHERE FUNCSCHEMA = '${SCHEMA}' AND FUNCNAME = '${OBNAME}'"
+db2 "export to /dev/null of del lobs to ../file/tmp lobfile DDL.TMP modified by lobsinfile SELECT BODY||'#' FROM SYSCAT.FUNCTIONS WHERE FUNCSCHEMA = '${SCHEMA}' AND FUNCNAME = '${OBNAME}'" > /dev/null 2>&1
 mv ${PWDNOW}/../file/tmp/DDL.TMP.* ${PWDNOW}/../file/tmp/DDL.tmp
 fi;
 #序列
