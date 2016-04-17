@@ -51,7 +51,7 @@ for SCHEMA in `echo ${SCHEMAS//,/ }`;
 
 echo "begin with call SYSPROC.ADMIN_REVALIDATE_DB_OBJECTS()"
 db2 connect to ${DATABASE} user ${USERID} using ${USERPASSWD}
-db2 call SYSPROC.ADMIN_REVALIDATE_DB_OBJECTS()
+db2 "call SYSPROC.ADMIN_REVALIDATE_DB_OBJECTS()"
 echo "ending call SYSPROC.ADMIN_REVALIDATE_DB_OBJECTS()"
 	
 
