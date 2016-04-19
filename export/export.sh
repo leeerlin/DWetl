@@ -14,9 +14,20 @@ PWDNOW=`pwd`
 
 eval $(grep SCHEMAS ../common.cfg)
 
-if [ $# -eq 1 ] ; then
-	SCHEMAS=$1
-fi;
+unset OBO 
+while [ -n "$1" ]
+do
+  case $1 in 
+   -1by1) OBO=1;;
+   -S) SCHEMAS="$2"
+   		 shift 1;;
+   --) shift
+       break;;
+   *) echo "$1 不是参数，忽略"
+   esac
+   shift
+done
+
 echo "This shell will output schema include : ${SCHEMAS} "
 
 for SCHEMA in `echo ${SCHEMAS//,/ }`;
@@ -24,14 +35,23 @@ for SCHEMA in `echo ${SCHEMAS//,/ }`;
 		echo `date "+%Y-%m-%d %H:%M:%S"`
 		echo "开始导出数据结构，模式名：${SCHEMA}"
 		echo "查看日志命令：tail -f ${PWDNOW}/../file/logs/export_structure.log"
-		sh ${PWDNOW}/export_structure.sh $SCHEMA > ${PWDNOW}/../file/logs/export_structure.log
+		
+		if [[ ${OBO} = '1' ]] ; then
+			sh check_exp_db_create.sh $SCHEMA 
+			ln -sf ../file/tmp/export_db_create/${SCHEMA}.lst ./${SCHEMA}.lst
+			sh export_single.sh -nodata -f ${SCHEMA}.lst >> ${PWDNOW}/../file/logs/export_structure.log
+			rm -r ./${SCHEMA}.lst
+		else 
+			sh ${PWDNOW}/export_structure.sh $SCHEMA >> ${PWDNOW}/../file/logs/export_structure.log
+		fi;
+		
 		echo `date "+%Y-%m-%d %H:%M:%S"`
 		echo "导出数据机构结束，模式名：${SCHEMA}"
 
 		echo `date "+%Y-%m-%d %H:%M:%S"`
 		echo "开始导出数据，模式名：${SCHEMA}"
 		echo "查看日志命令：tail -f ${PWDNOW}/../file/logs/export_data.log"
-		sh ${PWDNOW}/export_data.sh $SCHEMA > ${PWDNOW}/../file/logs/export_data.log
+		sh ${PWDNOW}/export_data.sh $SCHEMA >> ${PWDNOW}/../file/logs/export_data.log
 		echo `date "+%Y-%m-%d %H:%M:%S"`
 		echo "导出数据结束，模式名：${SCHEMA}"
 
